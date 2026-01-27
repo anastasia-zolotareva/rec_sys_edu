@@ -1,0 +1,40 @@
+# Основные библиотеки для работы с данными
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Deep Learning
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Machine Learning
+scikit-learn>=1.3.0
+
+# Визуализация
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Работа с данными Kaggle
+kagglehub>=0.2.0
+
+# Научные вычисления
+scipy>=1.10.0
+
+# Прогресс-бары
+tqdm>=4.65.0
+
+# Jupyter для ноутбуков
+jupyter>=1.0.0
+ipykernel>=6.25.0
+notebook>=6.5.0
+
+# Тестирование
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+
+# Форматирование кода (опционально)
+black>=23.0.0
+flake8>=6.0.0
+
+# Типизация (опционально)
+mypy>=1.0.0

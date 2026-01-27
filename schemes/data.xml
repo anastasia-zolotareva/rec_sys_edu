@@ -1,0 +1,97 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" version="29.3.1">
+  <diagram id="env-get-state" name="Page-1">
+    <mxGraphModel dx="2696" dy="1384" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontStyle=1;fontSize=22;fontFamily=Times New Roman;strokeWidth=2;" value="&lt;font style=&quot;font-size: 30px;&quot;&gt;EducationalEnvironment._get_state()&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="520" x="740" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontStyle=1;fontSize=22;fontFamily=Times New Roman;strokeWidth=2;" value="&lt;font style=&quot;font-size: 30px;&quot;&gt;1) embedding-студента&lt;br&gt;(32 dims)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="140" width="392" x="20" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontStyle=1;fontSize=22;fontFamily=Times New Roman;strokeWidth=2;" value="&lt;font style=&quot;font-size: 30px;&quot;&gt;2) Контекст&lt;br&gt;(10 dims)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="140" width="392" x="412" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="12" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontStyle=1;fontSize=22;fontFamily=Times New Roman;strokeWidth=2;" value="&lt;font style=&quot;font-size: 30px;&quot;&gt;3) Демографические&lt;br&gt;признаки&lt;br&gt;(6 dims)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="140" width="392" x="804" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="13" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontStyle=1;fontSize=22;fontFamily=Times New Roman;strokeWidth=2;" value="&lt;font style=&quot;font-size: 30px;&quot;&gt;4) История&lt;br&gt;(15 dims)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="140" width="392" x="1196" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="14" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontStyle=1;fontSize=22;fontFamily=Times New Roman;strokeWidth=2;" value="&lt;font style=&quot;font-size: 30px;&quot;&gt;5) Временные признаки&lt;br&gt;(2 dims)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="140" width="392" x="1588" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="20" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontSize=20;fontFamily=Times New Roman;" value="&lt;font style=&quot;font-size: 24px;&quot;&gt;model.user_emb_fm(u)&lt;br&gt;(torch Embedding)&lt;br&gt;→ numpy(32)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="130" width="352" x="40" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="21" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontSize=20;fontFamily=Times New Roman;" value="&lt;font style=&quot;font-size: 24px;&quot;&gt;OneHot + Класс (3)&lt;br&gt;Семестр (2) +&lt;br&gt;Период (3) +&lt;br&gt;Время семестра (случайное) +&lt;br&gt;Хорошие рейтинги (прошлые&lt;br&gt;вознаграждения)&lt;br&gt;Размер = 3+2+3+1+1 = 10&lt;/font&gt;" vertex="1">
+          <mxGeometry height="210" width="356" x="430" y="345" as="geometry" />
+        </mxCell>
+        <mxCell id="22" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontSize=20;fontFamily=Times New Roman;" value="&lt;font style=&quot;font-size: 24px;&quot;&gt;Пол (1) + Возрастная группа (4) +&lt;br&gt;Семейное Положение (1)&lt;br&gt;Размер = 1 + 4 + 1 = 6&lt;/font&gt;" vertex="1">
+          <mxGeometry height="150" width="360" x="820" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="23" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontSize=20;fontFamily=Times New Roman;" value="&lt;font style=&quot;font-size: 24px;&quot;&gt;История последних итераций&lt;br&gt;Размер вектора 15&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="368" x="1208" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="24" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontSize=20;fontFamily=Times New Roman;" value="&lt;font style=&quot;font-size: 24px;&quot;&gt;Прогресс и длина истории&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="368" x="1600" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="30" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontSize=22;fontFamily=Times New Roman;" value="&lt;font style=&quot;font-size: 30px;&quot;&gt;Сложение всех частей в один вектор&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="960" x="520" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="31" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontStyle=1;fontSize=22;fontFamily=Times New Roman;strokeWidth=2;" value="&lt;font style=&quot;font-size: 30px;&quot;&gt;S&lt;sub&gt;t&lt;/sub&gt;&lt;br&gt;(вектор состояния, размерности state_dim=65)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="80" width="700" x="650" y="680" as="geometry" />
+        </mxCell>
+        <mxCell id="40" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;fillColor=none;" value="" vertex="1">
+          <mxGeometry width="1960" x="20" y="690" as="geometry" />
+        </mxCell>
+        <mxCell id="100" edge="1" parent="1" source="2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="101" edge="1" parent="1" source="10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="102" edge="1" parent="1" source="11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="103" edge="1" parent="1" source="12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="22">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="104" edge="1" parent="1" source="13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="105" edge="1" parent="1" source="14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="24">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="106" edge="1" parent="1" source="30" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="31">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="cBhYYyuDO0_pFUOpt8qT-106" edge="1" parent="1" style="endArrow=none;html=1;rounded=0;strokeWidth=2;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="20" y="570" as="sourcePoint" />
+            <mxPoint x="1980" y="570" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="cBhYYyuDO0_pFUOpt8qT-107" edge="1" parent="1" style="endArrow=none;html=1;rounded=0;strokeWidth=2;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1980" y="570" as="sourcePoint" />
+            <mxPoint x="1980" y="430" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="cBhYYyuDO0_pFUOpt8qT-109" edge="1" parent="1" style="endArrow=none;html=1;rounded=0;strokeWidth=2;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="20" y="570" as="sourcePoint" />
+            <mxPoint x="20" y="430" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="cBhYYyuDO0_pFUOpt8qT-110" edge="1" parent="1" style="endArrow=none;html=1;rounded=0;strokeWidth=2;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1000" y="610" as="sourcePoint" />
+            <mxPoint x="1000" y="570" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
