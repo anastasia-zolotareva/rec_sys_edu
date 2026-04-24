@@ -3,7 +3,7 @@
 """
 
 import numpy as np
-from typing import List, Optional
+from typing import Dict, List, Optional, Sequence
 from sklearn.metrics import precision_score, recall_score, f1_score
 
 
@@ -234,6 +234,127 @@ def calculate_cumulative_discounted_reward(
         discount *= gamma
     
     return float(cdr)
+
+
+def calculate_learning_slope(
+    rewards: Sequence[float],
+    n_segments: int = 5,
+    *,
+    dataset_type: Optional[str] = None,
+    signal: str = "auto",
+) -> float:
+    """Learning Slope по сегментам reward-кривой или cumulative-кривой.
+
+    Args:
+        rewards: Последовательность step rewards.
+        n_segments: Число сегментов для линейной аппроксимации.
+        dataset_type: Тип датасета (например, ``oulad`` или ``itmrec``).
+        signal: ``reward`` | ``cumulative`` | ``auto``.
+            ``auto`` использует cumulative-кривую для OULAD и reward-кривую
+            для остальных датасетов.
+
+    Положительное значение означает рост полезности по ходу траектории.
+    Для OULAD cumulative-сигнал устойчивее, потому что step reward является
+    инкрементом proxy-метрик и быстро насыщается.
+    """
+    rewards = np.asarray(list(rewards), dtype=float)
+    if rewards.size < max(n_segments, 2):
+        return 0.0
+
+    dataset_key = (dataset_type or "").strip().lower()
+    signal_key = signal.strip().lower()
+    if signal_key == "auto":
+        signal_key = "cumulative" if dataset_key == "oulad" else "reward"
+
+    if signal_key == "cumulative":
+        values = np.cumsum(rewards)
+    elif signal_key == "reward":
+        values = rewards
+    else:
+        raise ValueError(f"Unknown learning slope signal: {signal}")
+
+    segments = np.array_split(values, n_segments)
+    segment_means = np.array([seg.mean() for seg in segments if len(seg) > 0])
+    if segment_means.size < 2:
+        return 0.0
+    x = np.arange(segment_means.size)
+    slope = float(np.polyfit(x, segment_means, 1)[0])
+    return slope
+
+
+def calculate_adaptability_score(
+    precisions: Sequence[float],
+    recalls: Sequence[float],
+) -> float:
+    """AdaptabilityScore (H2) = ``1 - (σ_P + σ_R) / 2``.
+
+    Чем меньше разброс Precision@K и Recall@K по контекстам
+    (или стратам пользователей), тем выше адаптивность системы. Мера
+    ограничена диапазоном ``[0, 1]``. Если одной из последовательностей
+    недостаточно (меньше двух значений), соответствующий σ считается
+    равным 0.
+    """
+    p_arr = np.asarray(list(precisions), dtype=float)
+    r_arr = np.asarray(list(recalls), dtype=float)
+    sigma_p = float(p_arr.std()) if p_arr.size >= 2 else 0.0
+    sigma_r = float(r_arr.std()) if r_arr.size >= 2 else 0.0
+    score = 1.0 - (sigma_p + sigma_r) / 2.0
+    return float(np.clip(score, 0.0, 1.0))
+
+
+def calculate_stability(values: Sequence[float]) -> float:
+    """Стабильность метрики по §3.5: ``std({values})``.
+
+    Используется для PrecisionStability / RecallStability — это стандартное
+    отклонение метрики по контекстам или стратам. Меньшее значение
+    соответствует более стабильной системе.
+    """
+    arr = np.asarray(list(values), dtype=float)
+    if arr.size < 2:
+        return 0.0
+    return float(arr.std())
+
+
+def calculate_reward_progress_score(
+    per_user_segments: Sequence[Sequence[float]],
+) -> float:
+    """Относительный прирост средней награды между первой и последней
+    четвертью траектории (легаси-метрика, оставлена для совместимости).
+    """
+    scores: List[float] = []
+    for rewards in per_user_segments:
+        arr = np.asarray(list(rewards), dtype=float)
+        if arr.size < 4:
+            continue
+        quarter = max(1, arr.size // 4)
+        first = arr[:quarter].mean()
+        last = arr[-quarter:].mean()
+        denom = abs(first) + 1e-8
+        scores.append(float((last - first) / denom))
+    if not scores:
+        return 0.0
+    return float(np.mean(scores))
+
+
+def evaluate_recommendation_set(
+    recommendations: Sequence[int],
+    ground_truth: Sequence[int],
+    *,
+    k: int = 10,
+    n_items: Optional[int] = None,
+    item_popularity: Optional[Dict[int, float]] = None,
+) -> Dict[str, float]:
+    """Удобный фасад — считает стандартный набор метрик для одной рекомендации."""
+    rec = list(recommendations)
+    gt = list(ground_truth)
+    return {
+        f"precision@{k}": calculate_precision_at_k(rec, gt, k, n_items),
+        f"recall@{k}": calculate_recall_at_k(rec, gt, k, n_items),
+        f"f1@{k}": calculate_f1_at_k(rec, gt, k, n_items),
+        "coverage": calculate_coverage(rec, n_items or max(rec + gt + [0]) + 1),
+        "novelty": calculate_novelty(rec, item_popularity or {}, k),
+        "diversity": calculate_diversity(rec),
+    }
 
 
 def calculate_retention_rate(

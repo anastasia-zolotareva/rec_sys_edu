@@ -73,12 +73,12 @@ class DQNTrainer:
         self.target_network = DuelingDQN(
             agent.state_dim,
             agent.action_dim,
-            hidden_dims=[256, 128, 64],
+            hidden_dims=getattr(agent, "hidden_dims", [256, 128, 64]),
             device=self.device
         )
         self.target_network.load_state_dict(agent.state_dict())
         self.target_network.to(self.device)
-        self.target_network.eval()  # Target network всегда в режиме оценки
+        self.target_network.eval()  # Target network always in evaluation mode
         
         # Конфигурация
         self.gamma = config.get('gamma', 0.99)
@@ -86,13 +86,15 @@ class DQNTrainer:
         self.tau = config.get('tau', 0.01)  # Для мягкого обновления
         self.target_update_freq = config.get('target_update_freq', 100)
         self.batch_size = config.get('batch_size', 64)
+        self.max_steps_per_episode = int(config.get('max_steps_per_episode', 100))
         self.epsilon_start = config.get('epsilon_start', 1.0)
         self.epsilon_end = config.get('epsilon_end', 0.01)
         self.epsilon_decay = config.get('epsilon_decay', 0.995)
+        self.use_action_mask = bool(config.get('use_action_mask', True))
         
         # Оптимизатор и функция потерь
         self.optimizer = torch.optim.Adam(self.agent.parameters(), lr=self.lr)
-        self.loss_fn = nn.SmoothL1Loss()  # Huber loss
+        self.loss_fn = nn.SmoothL1Loss(reduction='none')  # Huber loss с весами PER
         
         # Трекеры
         self.epsilon = self.epsilon_start
@@ -107,7 +109,7 @@ class DQNTrainer:
         print(f"  Gamma: {self.gamma}")
         print(f"  Learning rate: {self.lr}")
         print(f"  Batch size: {self.batch_size}")
-        print(f"  Epsilon: {self.epsilon_start} → {self.epsilon_end}")
+        print(f"  Epsilon: {self.epsilon_start} -> {self.epsilon_end}")
     
     def update_epsilon(self) -> float:
         """
@@ -137,32 +139,57 @@ class DQNTrainer:
         self,
         rewards: torch.Tensor,
         next_states: torch.Tensor,
-        dones: torch.Tensor
+        dones: torch.Tensor,
+        next_action_masks: torch.Tensor = None
     ) -> torch.Tensor:
         """
         Вычисление целевых значений (TD targets).
+        
+        Поддерживает action_mask для OULAD и других датасетов,
+        где допустимое множество действий зависит от состояния.
         
         Args:
             rewards: Награды [batch_size]
             next_states: Следующие состояния [batch_size, state_dim]
             dones: Флаги завершения [batch_size]
+            next_action_masks: Маски допустимых действий [batch_size, action_dim] (опционально)
         
         Returns:
             TD targets [batch_size]
         """
         with torch.no_grad():
             # Q-значения от target network
-            next_q_values = self.target_network(next_states)
-            next_q_max = next_q_values.max(1)[0]
+            next_q_values = self.target_network(next_states)  # [batch_size, action_dim]
+            
+            # Применяем маску, если предоставлена (для OULAD и др.)
+            if next_action_masks is not None:
+                # Маски: 1 = допустимо, 0 = запрещено
+                # Замещаем запрещенные действия на -inf для исключения из max
+                masked_q = next_q_values.clone()
+                masked_q[next_action_masks == 0] = -float('inf')
+                next_q_max = masked_q.max(1)[0]
+                
+                # Проверка: если все действия запрещены (всё -inf), используем 0
+                next_q_max = torch.where(
+                    torch.isinf(next_q_max),
+                    torch.zeros_like(next_q_max),
+                    next_q_max
+                )
+            else:
+                # Стандартный режим без маски (для ITM-Rec)
+                next_q_max = next_q_values.max(1)[0]
             
             # TD targets: r + γ * max Q(s', a') * (1 - done)
             td_targets = rewards + self.gamma * next_q_max * (1 - dones)
         
         return td_targets
     
-    def train_step(self) -> Optional[float]:
+    def train_step(self, next_action_masks: torch.Tensor = None) -> Optional[float]:
         """
         Один шаг обучения.
+        
+        Args:
+            next_action_masks: Опциональные маски для next_states (для OULAD)
         
         Returns:
             Значение потери или None если буфер недостаточно заполнен
@@ -175,7 +202,7 @@ class DQNTrainer:
         if batch is None:
             return None
         
-        states, actions, rewards, next_states, dones, indices, weights = batch
+        states, actions, rewards, next_states, dones, next_action_masks, indices, weights = batch
         
         # Перемещение на device
         states = states.to(self.device)
@@ -184,19 +211,20 @@ class DQNTrainer:
         next_states = next_states.to(self.device)
         dones = dones.to(self.device)
         weights = weights.to(self.device)
+        if next_action_masks is not None:
+            next_action_masks = next_action_masks.to(self.device)
         
         # Текущие Q-значения
         current_q_values = self.agent(states)
         current_q = current_q_values.gather(1, actions.unsqueeze(1)).squeeze()
         
-        # Целевые Q-значения
-        with torch.no_grad():
-            # Q-значения от target network
-            next_q_values = self.target_network(next_states)
-            next_q_max = next_q_values.max(1)[0]
-            
-            # TD targets
-            td_targets = rewards + self.gamma * next_q_max * (1 - dones)
+        # Целевые Q-значения (с поддержкой action_mask)
+        td_targets = self.compute_td_targets(
+            rewards=rewards,
+            next_states=next_states,
+            dones=dones,
+            next_action_masks=next_action_masks  # Если передана, используется для маскирования
+        )
         
         # Ошибка TD
         td_errors = td_targets - current_q
@@ -205,7 +233,8 @@ class DQNTrainer:
         self.buffer.update_priorities(indices, td_errors.cpu().detach().numpy())
         
         # Потеря с учетом importance sampling weights
-        loss = (weights * self.loss_fn(current_q, td_targets)).mean()
+        per_sample_loss = self.loss_fn(current_q, td_targets)
+        loss = (weights * per_sample_loss).mean()
         
         # Backward pass
         self.optimizer.zero_grad()
@@ -225,12 +254,13 @@ class DQNTrainer:
         
         return loss.item()
     
-    def train_episode(self, max_steps: int = 100) -> Tuple[float, float]:
+    def train_episode(self, max_steps: Optional[int] = None) -> Tuple[float, float]:
         """
         Обучение на одном эпизоде.
         
         Args:
-            max_steps: Максимальное количество шагов в эпизоде
+            max_steps: Максимальное количество шагов в эпизоде.
+                Если не задан, используется ``config['max_steps_per_episode']``.
         
         Returns:
             Tuple (episode_reward, avg_loss):
@@ -240,16 +270,39 @@ class DQNTrainer:
         state = self.env.reset()
         episode_reward = 0
         episode_losses = []
-        
+        max_steps = int(max_steps or self.max_steps_per_episode)
+
         for step in range(max_steps):
+            # Маска допустимых действий
+            mask = None
+            if self.use_action_mask and hasattr(self.env, 'get_action_mask'):
+                try:
+                    mask = self.env.get_action_mask()
+                except Exception:
+                    mask = None
+            
             # Выбор действия
-            action = self.agent.get_action(state, self.epsilon)
+            action = self.agent.get_action(state, self.epsilon, action_mask=mask)
             
             # Шаг в среде
             next_state, reward, done, info = self.env.step(action)
             
+            next_mask = None
+            if self.use_action_mask and not done and hasattr(self.env, 'get_action_mask'):
+                try:
+                    next_mask = self.env.get_action_mask()
+                except Exception:
+                    next_mask = None
+
             # Сохранение в буфер
-            self.buffer.push(state, action, reward, next_state, done)
+            self.buffer.push(
+                state,
+                action,
+                reward,
+                next_state,
+                done,
+                next_action_mask=next_mask,
+            )
             
             # Шаг обучения
             loss = self.train_step()
@@ -302,8 +355,13 @@ class DQNTrainer:
             done = False
             
             while not done:
-                # Жадное действие (epsilon=0.01 для небольшой случайности)
-                action = self.agent.get_action(state, epsilon=0.01)
+                mask = None
+                if self.use_action_mask and hasattr(self.env, 'get_action_mask'):
+                    try:
+                        mask = self.env.get_action_mask()
+                    except Exception:
+                        mask = None
+                action = self.agent.get_action(state, epsilon=0.01, action_mask=mask)
                 next_state, reward, done, _ = self.env.step(action)
                 
                 state = next_state

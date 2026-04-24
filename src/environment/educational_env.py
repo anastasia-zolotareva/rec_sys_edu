@@ -11,12 +11,15 @@ import torch
 from typing import Dict, Optional, List, Tuple, Any
 
 from .state_encoder import encode_context, encode_history, get_demographic_vector
+from .reward import (
+    calculate_cosine_novelty,
+    calculate_itmrec_reward,
+)
 
 
 class EducationalEnvironment:
-    """
-    Симулятор образовательной среды для RL обучения.
-    
+    """Симулятор образовательной среды для обучения RL агента.
+
     Состояние (state):
     - Эмбеддинг пользователя (32-dim)
     - Контекстный вектор (10-dim)
@@ -24,10 +27,10 @@ class EducationalEnvironment:
     - История взаимодействий (15-dim)
     - Временные метки (2-dim)
     ИТОГО: 65 измерений
-    
+
     Действие (action):
     - ID рекомендованного предмета (0 до n_items-1)
-    
+
     Награда (reward):
     - Многокритериальная: Rating, App, Data, Ease
     - С учетом новизны (novelty bonus)
@@ -40,11 +43,11 @@ class EducationalEnvironment:
         users_df: pd.DataFrame,
         items_df: pd.DataFrame,
         deepfm_model,
-        dataset
+        dataset,
+        config: Optional[Dict[str, Any]] = None,
     ):
-        """
-        Инициализация среды.
-        
+        """Инициализирует образовательную среду.
+
         Args:
             ratings_df: DataFrame с рейтингами
             users_df: DataFrame с пользователями
@@ -67,16 +70,35 @@ class EducationalEnvironment:
         self.item_embeddings_cache = {}
         self.user_embeddings_cache = {}
         
-        # Параметры среды
-        self.max_trajectory_length = 10
-        self.max_recommendations = 5
-        self.novelty_weight = 0.05
+        # Параметры среды (могут быть переопределены через config)
+        cfg = dict(config or {})
+        env_cfg = cfg.get('environment', cfg)
+        self.max_trajectory_length = int(env_cfg.get('max_trajectory_length', 10))
+        self.max_recommendations = int(env_cfg.get('max_recommendations', 5))
+        self.novelty_weight = float(env_cfg.get('novelty_weight', 0.05))
+        self.reward_mode = env_cfg.get('reward_mode', 'itmrec')
+        self.novelty_mode = env_cfg.get('novelty_mode', 'cosine')  # 'cosine' или 'popularity'
+        self.reward_base_weights = env_cfg.get('reward_weights', None)
+        # Порог низкой награды = 0.3, случайное завершение p=0.1
+        self.low_reward_threshold = float(env_cfg.get('low_reward_threshold', 0.3))
+        self.low_reward_window = int(env_cfg.get('low_reward_window', 3))
+        self.enable_low_reward_termination = bool(
+            env_cfg.get('enable_low_reward_termination', True)  # Включено по умолчанию
+        )
+        # Случайное завершение с вероятностью p
+        self.termination_random_prob = float(env_cfg.get('termination_random_prob', 0.1))
+        
+        # Популярность предметов (для режима novelty='popularity' и fallback)
+        self.item_popularity = dict(
+            self.ratings['ItemID_encoded'].value_counts().to_dict()
+        )
+        self.max_item_popularity = max(self.item_popularity.values()) if self.item_popularity else 1
         
         # Инициализация кэшей
         self._initialize_caches()
     
     def _initialize_caches(self):
-        """Инициализация кэшей для ускорения работы."""
+        """Инициализирует кэши эмбеддингов и истории пользователей."""
         print("Инициализация кэшей...")
         
         # Кэш эмбеддингов предметов
@@ -91,7 +113,7 @@ class EducationalEnvironment:
             user_history = self.ratings[
                 self.ratings['UserID_encoded'] == user_id
             ]['ItemID_encoded'].tolist()
-            self.user_history_cache[user_id] = user_history[:10]  # Последние 10
+            self.user_history_cache[user_id] = user_history[:10]  # Последние 10 элементов
         
         print(f"Кэши инициализированы: {len(self.user_history_cache)} пользователей, "
               f"{len(self.item_embeddings_cache)} предметов")
@@ -101,15 +123,14 @@ class EducationalEnvironment:
         user_id: Optional[int] = None,
         context: Optional[Dict[str, int]] = None
     ) -> np.ndarray:
-        """
-        Сброс среды для нового эпизода.
-        
+        """Инициализирует среду для нового эпизода.
+
         Args:
             user_id: ID пользователя (если None, выбирается случайно)
             context: Контекстные переменные (если None, выбирается из истории пользователя)
-        
+
         Returns:
-            Начальное состояние [65]
+            Начальное состояние размерности 65
         """
         if user_id is None:
             # Случайный выбор пользователя
@@ -151,12 +172,48 @@ class EducationalEnvironment:
         
         return initial_state
     
-    def _get_state(self) -> np.ndarray:
+    # Сегменты состояния (см. _get_state ниже). Используются модулями H2
+    # для ablation-анализа по конфигурациям состояния (``state_ablation``).
+    STATE_SEGMENTS = {
+        "user": (0, 32),
+        "context": (32, 42),
+        "demo": (42, 48),
+        "history": (48, 63),
+        "time": (63, 65),
+    }
+
+    def _apply_state_ablation(self, state: np.ndarray) -> np.ndarray:
+        """Зануляет отключенные сегменты состояния согласно ``self.state_ablation``.
+
+        Поддерживаемые режимы: ``None`` / ``"full"`` (без ablation),
+        ``"no_context"``, ``"no_demo"``, ``"no_history"``,
+        ``"no_context_no_demo"``.
         """
-        Формирование вектора состояния s_t.
-        
+        mode = getattr(self, "state_ablation", None)
+        if not mode or mode == "full":
+            return state
+        segments_to_zero: List[str] = []
+        if mode == "no_context":
+            segments_to_zero = ["context"]
+        elif mode == "no_demo":
+            segments_to_zero = ["demo"]
+        elif mode == "no_history":
+            segments_to_zero = ["history"]
+        elif mode == "no_context_no_demo":
+            segments_to_zero = ["context", "demo"]
+        else:
+            return state
+        state = state.copy()
+        for name in segments_to_zero:
+            lo, hi = self.STATE_SEGMENTS[name]
+            state[lo:hi] = 0.0
+        return state
+
+    def _get_state(self) -> np.ndarray:
+        """Формирует вектор состояния размерности 65.
+
         Returns:
-            Вектор состояния размерности 65
+            Вектор состояния
         """
         state_components = []
         
@@ -193,18 +250,17 @@ class EducationalEnvironment:
         # Проверка размерности
         expected_dim = 32 + 10 + 6 + 15 + 2  # 65
         assert len(state) == expected_dim, f"State dimension mismatch: {len(state)} != {expected_dim}"
-        
-        return state
+
+        return self._apply_state_ablation(state)
     
     def _get_user_embedding(self, user_id: int) -> np.ndarray:
-        """
-        Получение эмбеддинга пользователя.
-        
+        """Вычисляет эмбеддинг пользователя.
+
         Args:
             user_id: Закодированный ID пользователя
-        
+
         Returns:
-            Эмбеддинг пользователя [32]
+            Эмбеддинг пользователя размерности 32
         """
         if user_id in self.user_embeddings_cache:
             return self.user_embeddings_cache[user_id]
@@ -218,15 +274,14 @@ class EducationalEnvironment:
         return user_emb
     
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, Dict[str, Any]]:
-        """
-        Выполнение шага в среде.
-        
+        """Выполняет один шаг в среде.
+
         Args:
             action: ID предмета для рекомендации (0 до n_items-1)
-        
+
         Returns:
             Tuple (next_state, reward, done, info):
-            - next_state: Следующее состояние [65]
+            - next_state: Следующее состояние размерности 65
             - reward: Награда за действие
             - done: Флаг завершения эпизода
             - info: Дополнительная информация
@@ -281,12 +336,11 @@ class EducationalEnvironment:
         return next_state, reward, done, info
     
     def _simulate_feedback(self, item_id: int) -> Dict[str, float]:
-        """
-        Имитация реакции пользователя на рекомендацию.
-        
+        """Имитирует реакцию пользователя на рекомендацию.
+
         Args:
             item_id: ID рекомендованного предмета
-        
+
         Returns:
             Словарь с оценками:
             {
@@ -347,107 +401,82 @@ class EducationalEnvironment:
         return feedback
     
     def _calculate_reward(self, feedback: Dict[str, float], action: int) -> float:
+        """Вычисляет вознаграждение по многокритериальной формуле ITM-Rec.
+
+        Использует функцию calculate_itmrec_reward из модуля reward.
         """
-        Расчет вознаграждения по многокритериальной формуле.
-        
-        Args:
-            feedback: Словарь с оценками пользователя
-            action: ID рекомендованного предмета
-        
-        Returns:
-            Награда за действие
-        """
-        # Базовые веса из EDA
-        weights = {'w1': 0.50, 'w2': 0.30, 'w3': 0.15, 'w4': 0.05}
-        
-        # Корректировка весов по контексту
-        if self.current_context['lockdown'] in [1, 2]:  # DUR или POS
-            weights['w3'] = 0.25  # Усиление важности Ease
-            weights['w1'] = 0.45
-        
-        if self.current_context['class'] == 1:  # DB
-            weights['w2'] = 0.35  # Усиление важности Data
-        
-        # Демографический множитель
         demo_vector = get_demographic_vector(
             self.current_user,
             self.users,
-            self.dataset.user_encoder
+            self.dataset.user_encoder,
         )
-        married = demo_vector[-1]
-        age_group = np.argmax(demo_vector[1:5])
-        
-        demo_multiplier = 1.0
-        if married == 1:
-            demo_multiplier *= 0.9  # Женатые более критичны
-        
-        if age_group in [0, 1]:  # <20 или 20-25
-            demo_multiplier *= 1.1  # Молодые ценят больше
-        
-        # Расчет новизны
         novelty = self._calculate_novelty(action)
-        
-        # Базовое вознаграждение
-        normalized_feedback = {
-            'app': feedback['app'] / 5.0,
-            'data': feedback['data'] / 5.0,
-            'ease': feedback['ease'] / 5.0
-        }
-        
-        base_reward = (
-            weights['w1'] * normalized_feedback['app'] +
-            weights['w2'] * normalized_feedback['data'] +
-            weights['w3'] * normalized_feedback['ease']
+        return calculate_itmrec_reward(
+            feedback=feedback,
+            context=self.current_context,
+            demo_vector=demo_vector,
+            novelty=novelty,
+            novelty_weight=self.novelty_weight,
+            base_weights=self.reward_base_weights,
         )
-        
-        # Финальное вознаграждение с учетом новизны и демографии
-        reward = base_reward * demo_multiplier + self.novelty_weight * novelty
-        
-        return float(reward)
     
     def _calculate_novelty(self, action: int) -> float:
+        """Вычисляет новизну рекомендации.
+
+        - ``cosine``: 1 минус максимальное косинусное сходство с уже рекомендованными.
+        - ``popularity``: 1 минус нормализованная популярность.
         """
-        Расчет новизны рекомендации.
+        if self.novelty_mode == 'cosine':
+            novelty = calculate_cosine_novelty(
+                action=action,
+                recommended_items=self.recommended_items,
+                item_embeddings_cache=self.item_embeddings_cache,
+                popularity=self.item_popularity,
+                max_popularity=self.max_item_popularity,
+            )
+        else:
+            pop = self.item_popularity.get(action, 0)
+            novelty = 1.0 - pop / max(self.max_item_popularity, 1)
         
-        Args:
-            action: ID рекомендованного предмета
-        
-        Returns:
-            Новизна (0-1), где 1 - максимальная новизна
-        """
-        # Новизна = обратная популярность предмета
-        item_popularity = self.ratings[
-            self.ratings['ItemID_encoded'] == action
-        ].shape[0]
-        
-        max_popularity = self.ratings['ItemID_encoded'].value_counts().max()
-        novelty = 1.0 - (item_popularity / max_popularity) if max_popularity > 0 else 1.0
-        
-        # Бонус за разнообразие (не рекомендовали ранее в эпизоде)
         if action not in self.recommended_items:
             novelty += 0.1
-        
-        return np.clip(novelty, 0.0, 1.0)
+        return float(np.clip(novelty, 0.0, 1.0))
     
     def _check_termination(self) -> bool:
+        """Проверяет условия завершения эпизода.
+
+        Завершение происходит при:
+        1. Достигнута максимальная длина траектории
+        2. Достигнуто максимальное количество рекомендаций
+        3. Средняя награда последних N шагов ниже порога (0.3)
+        4. Случайное завершение с вероятностью p=0.1
         """
-        Проверка условий завершения эпизода.
+        import random
         
-        Returns:
-            True если эпизод завершен
-        """
-        # Завершение по достижению максимальной длины траектории
+        # Случайное завершение с вероятностью p
+        if random.random() < self.termination_random_prob:
+            return True
+        
         if self.step_count >= self.max_trajectory_length:
             return True
-        
-        # Завершение по достижению максимального количества рекомендаций
         if len(self.recommended_items) >= self.max_recommendations:
             return True
-        
-        # Завершение по низкой награде (опционально)
-        if len(self.trajectory) > 0:
-            recent_rewards = [r['reward'] for r in self.trajectory[-3:]]
-            if len(recent_rewards) == 3 and np.mean(recent_rewards) < 0.2:
+        if self.enable_low_reward_termination and len(self.trajectory) >= self.low_reward_window:
+            recent_rewards = [r['reward'] for r in self.trajectory[-self.low_reward_window:]]
+            if np.mean(recent_rewards) < self.low_reward_threshold:
                 return True
-        
         return False
+
+    def get_action_mask(self) -> np.ndarray:
+        """Создает маску допустимых действий для ITM-Rec.
+
+        Для ITM-Rec все предметы валидны, но маскируются уже рекомендованные,
+        чтобы агент не выбирал их повторно.
+        """
+        mask = np.ones(self.dataset.n_items, dtype=np.float32)
+        for item_id in self.recommended_items:
+            if 0 <= int(item_id) < mask.shape[0]:
+                mask[int(item_id)] = 0.0
+        if mask.sum() == 0:
+            mask[:] = 1.0
+        return mask

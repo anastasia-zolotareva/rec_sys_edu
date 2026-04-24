@@ -7,7 +7,7 @@
 
 import numpy as np
 import torch
-from typing import Optional, Tuple, List
+from typing import List, Optional, Tuple
 
 
 class PrioritizedReplayBuffer:
@@ -31,7 +31,8 @@ class PrioritizedReplayBuffer:
         self,
         capacity: int = 10000,
         alpha: float = 0.6,
-        beta: float = 0.4
+        beta: float = 0.4,
+        beta_increment: float = 0.001,
     ):
         """
         Инициализация буфера.
@@ -47,7 +48,7 @@ class PrioritizedReplayBuffer:
         self.buffer = []
         self.priorities = []
         self.position = 0
-        self.beta_increment = 0.001
+        self.beta_increment = beta_increment
     
     def push(
         self,
@@ -55,7 +56,8 @@ class PrioritizedReplayBuffer:
         action: int,
         reward: float,
         next_state: np.ndarray,
-        done: bool
+        done: bool,
+        next_action_mask: Optional[np.ndarray] = None,
     ):
         """
         Добавление перехода в буфер.
@@ -66,6 +68,7 @@ class PrioritizedReplayBuffer:
             reward: Полученная награда
             next_state: Следующее состояние
             done: Флаг завершения эпизода
+            next_action_mask: Маска допустимых действий для следующего состояния.
         """
         if len(self.buffer) < self.capacity:
             self.buffer.append(None)
@@ -75,14 +78,36 @@ class PrioritizedReplayBuffer:
         valid_priorities = [p for p in self.priorities if p is not None]
         max_priority = max(valid_priorities) if valid_priorities else 1.0
         
-        self.buffer[self.position] = (state, action, reward, next_state, done)
+        mask_value = None
+        if next_action_mask is not None:
+            mask_value = np.asarray(next_action_mask, dtype=np.float32).copy()
+
+        self.buffer[self.position] = (
+            state,
+            action,
+            reward,
+            next_state,
+            done,
+            mask_value,
+        )
         self.priorities[self.position] = max_priority
         self.position = (self.position + 1) % self.capacity
     
     def sample(
         self,
         batch_size: int
-    ) -> Optional[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, List[int], torch.Tensor]]:
+    ) -> Optional[
+        Tuple[
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            Optional[torch.Tensor],
+            List[int],
+            torch.Tensor,
+        ]
+    ]:
         """
         Выборка батча с учетом приоритетов.
         
@@ -120,14 +145,32 @@ class PrioritizedReplayBuffer:
         
         # Сборка батча
         batch = [self.buffer[idx] for idx in indices]
-        states, actions, rewards, next_states, dones = zip(*batch)
-        
+        states, actions, rewards, next_states, dones, next_action_masks = zip(*batch)
+
+        mask_tensor: Optional[torch.Tensor] = None
+        if any(mask is not None for mask in next_action_masks):
+            inferred_dim = None
+            for mask in next_action_masks:
+                if mask is not None:
+                    inferred_dim = int(np.asarray(mask).shape[0])
+                    break
+            if inferred_dim is None:
+                inferred_dim = 0
+            filled_masks = [
+                np.asarray(mask, dtype=np.float32)
+                if mask is not None
+                else np.ones(inferred_dim, dtype=np.float32)
+                for mask in next_action_masks
+            ]
+            mask_tensor = torch.FloatTensor(np.asarray(filled_masks, dtype=np.float32))
+
         return (
-            torch.FloatTensor(states),
+            torch.FloatTensor(np.asarray(states, dtype=np.float32)),
             torch.LongTensor(actions),
             torch.FloatTensor(rewards),
-            torch.FloatTensor(next_states),
+            torch.FloatTensor(np.asarray(next_states, dtype=np.float32)),
             torch.FloatTensor(dones),
+            mask_tensor,
             indices.tolist(),
             torch.FloatTensor(weights)
         )

@@ -34,7 +34,7 @@ def plot_distributions(
     for idx, col in enumerate(columns):
         ax = axes[idx]
         
-        # Гистограмма с кривой плотности
+        # Гистограмма с кривой плотности вероятности
         sns.histplot(data=data, x=col, bins=5, kde=True, ax=ax,
                      stat='percent', edgecolor='black')
         
@@ -43,7 +43,7 @@ def plot_distributions(
         median_val = data[col].median()
         mode_val = data[col].mode()[0] if not data[col].mode().empty else mean_val
         
-        # Вертикальные линии для статистик
+        # Линии для основных статистик
         ax.axvline(mean_val, color='red', linestyle='--', linewidth=2,
                    label=f'Среднее: {mean_val:.2f}')
         ax.axvline(median_val, color='green', linestyle='--', linewidth=2,
@@ -130,7 +130,7 @@ def plot_training_progress(
     
     plot_idx = 0
     
-    # 1. Награды за эпизод
+    # 1. Награды за эпизод обучения
     axes[plot_idx].plot(training_rewards, alpha=0.7)
     axes[plot_idx].set_title('Награды за эпизод обучения')
     axes[plot_idx].set_xlabel('Эпизод')
@@ -145,7 +145,7 @@ def plot_training_progress(
         axes[plot_idx].legend()
     plot_idx += 1
     
-    # 2. Потери
+    # 2. Потери при обучении
     if training_losses and plot_idx < len(axes):
         axes[plot_idx].plot(training_losses, alpha=0.7)
         axes[plot_idx].set_title('Потери при обучении')
@@ -154,16 +154,16 @@ def plot_training_progress(
         axes[plot_idx].grid(True, alpha=0.3)
         plot_idx += 1
     
-    # 3. Epsilon
+    # 3. Коэффициент epsilon для поиска-использования компромисса
     if epsilon_values and plot_idx < len(axes):
         axes[plot_idx].plot(epsilon_values, 'g-', alpha=0.7)
-        axes[plot_idx].set_title('Динамика epsilon')
+        axes[plot_idx].set_title('Динамика коэффициента epsilon')
         axes[plot_idx].set_xlabel('Эпизод')
         axes[plot_idx].set_ylabel('Epsilon')
         axes[plot_idx].grid(True, alpha=0.3)
         plot_idx += 1
     
-    # 4. Оценка
+    # 4. Оценка модели
     if evaluation_scores and plot_idx < len(axes):
         episodes = [score['episode'] for score in evaluation_scores]
         eval_rewards = [score['mean_reward'] for score in evaluation_scores]
@@ -171,7 +171,7 @@ def plot_training_progress(
         
         axes[plot_idx].errorbar(episodes, eval_rewards, yerr=eval_stds,
                                fmt='o-', capsize=5, alpha=0.7)
-        axes[plot_idx].set_title('Оценка во время обучения')
+        axes[plot_idx].set_title('Оценка модели во время обучения')
         axes[plot_idx].set_xlabel('Эпизод')
         axes[plot_idx].set_ylabel('Средняя награда')
         axes[plot_idx].grid(True, alpha=0.3)

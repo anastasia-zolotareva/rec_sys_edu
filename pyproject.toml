@@ -41,6 +41,7 @@ dependencies = [
     "kagglehub>=0.2.0",
     "scipy>=1.10.0",
     "tqdm>=4.65.0",
+    "pyyaml>=6.0",
     "jupyter>=1.0.0",
     "ipykernel>=6.25.0",
     "notebook>=6.5.0",
@@ -55,6 +56,9 @@ dev = [
     "flake8>=6.0.0",
     "mypy>=1.0.0",
 ]
+
+[project.scripts]
+rec-sys-edu = "src.cli:main"
 
 [tool.setuptools]
 packages = ["src"]

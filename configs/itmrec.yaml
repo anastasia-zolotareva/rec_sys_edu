@@ -1,0 +1,73 @@
+# Конфигурация прототипа для датасета ITM-Rec.
+# Все параметры можно переопределять через CLI (`--config configs/itmrec.yaml`)
+# или через аргументы функций Jupyter API.
+
+dataset:
+  type: itmrec
+  kaggle_name: irecsys/itmrec
+  raw_dir: data/raw
+  processed_dir: data/processed
+  min_user_ratings: 3          # минимальное число оценок у пользователя (после фильтрации)
+  min_item_ratings: 2
+  train_ratio: 0.8
+  val_ratio: 0.1
+  test_ratio: 0.1
+  random_seed: 42
+
+model:
+  deepfm:
+    embedding_dim: 32
+    hidden_dims: [128, 64]
+    dropout: 0.2
+    n_epochs: 50
+    batch_size: 256
+    lr: 0.001
+    weight_decay: 1.0e-5
+  dqn:
+    state_dim: 65               # 32 (user) + 10 (context) + 6 (demo) + 15 (history) + 2 (time)
+    hidden_dims: [256, 128, 64]
+    dropout: 0.2
+
+training:
+  dqn:
+    gamma: 0.99
+    lr: 0.001
+    tau: 0.01
+    target_update_freq: 100
+    batch_size: 64
+    epsilon_start: 1.0
+    epsilon_end: 0.01
+    epsilon_decay: 0.995
+    n_episodes: 200
+    max_steps_per_episode: 10
+    eval_interval: 20
+    use_action_mask: true
+  replay_buffer:
+    capacity: 10000
+    alpha: 0.6
+    beta: 0.4
+    beta_increment: 0.001
+
+environment:
+  max_trajectory_length: 10
+  max_recommendations: 5
+  novelty_weight: 0.05
+  novelty_mode: cosine           # "cosine" | "popularity"
+  reward_mode: itmrec            # "itmrec" | "oulad"
+  reward_weights: {w1: 0.50, w2: 0.30, w3: 0.15, w4: 0.05}
+  enable_low_reward_termination: false
+  low_reward_window: 3
+  low_reward_threshold: 0.2
+
+evaluation:
+  k: 10
+  test_users: 20
+  trajectory_length: 100
+  n_long_term_users: 30
+  n_eval_episodes: 10
+  ablation_modes: [full, no_context, no_demo, no_history, no_novelty]
+
+artifacts:
+  models_dir: data/models
+  results_dir: results
+  run_prefix: itmrec

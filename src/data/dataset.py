@@ -27,12 +27,12 @@ class ITMDataset(Dataset):
         n_items: Количество уникальных предметов
         n_classes: Количество классов (специализаций)
         n_semesters: Количество семестров
-        n_lockdowns: Количество периодов COVID
+        n_lockdowns: Количество периодов блокировок
         user_encoder: LabelEncoder для пользователей
         item_encoder: LabelEncoder для предметов
         class_encoder: LabelEncoder для классов
         semester_encoder: LabelEncoder для семестров
-        lockdown_encoder: LabelEncoder для периодов COVID
+        lockdown_encoder: LabelEncoder для периодов блокировок
         rating_scaler: MinMaxScaler для нормализации рейтингов
     """
     
@@ -62,9 +62,9 @@ class ITMDataset(Dataset):
         self.users = users_df.copy()
         self.items = items_df.copy()
         
-        # Заполнение пропусков в Data колонке (если есть)
+        # Заполнение пропусков в колонке Data (если есть)
         if 'Data' in self.ratings.columns:
-            self.ratings['Data'].fillna(self.ratings['Data'].median(), inplace=True)
+            self.ratings['Data'] = self.ratings['Data'].fillna(self.ratings['Data'].median())
         
         # Кодирование
         self.ratings['UserID_encoded'] = self.user_encoder.fit_transform(self.ratings['UserID'])
@@ -133,9 +133,9 @@ class ITMDataset(Dataset):
     
     def train_test_split(
         self,
-        train_ratio: float = 0.7,
-        val_ratio: float = 0.15,
-        test_ratio: float = 0.15,
+        train_ratio: float = 0.8,
+        val_ratio: float = 0.1,
+        test_ratio: float = 0.1,
         batch_size: int = 256,
         shuffle: bool = True,
         random_state: Optional[int] = None

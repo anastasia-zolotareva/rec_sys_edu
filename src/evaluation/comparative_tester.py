@@ -88,32 +88,51 @@ class ComparativeTester:
         return [int(item[0]) for item in sorted_items[:k]]
     
     def static_deepfm_recommender(self, user_id: int, context: Dict, k: int = 10) -> List[int]:
-        """Статичный DeepFM-SVD++ рекомендатель."""
+        """Статичный DeepFM-SVD++ рекомендатель (работает и для ITM-Rec, и для OULAD).
+
+        Использует все выходные головы модели (multi-criteria prediction);
+        поля контекста берутся из back-compat ключей ``class/semester/lockdown``,
+        которые OULAD-среда экспортирует автоматически.
+        """
         device = self.deepfm_model.device
-        
-        # Создание тензоров для всех предметов
+        context = context or {}
+
         item_ids = torch.arange(self.n_items).long().to(device)
-        user_ids = torch.LongTensor([user_id] * self.n_items).to(device)
-        class_ids = torch.LongTensor([context['class']] * self.n_items).to(device)
-        semester_ids = torch.LongTensor([context['semester']] * self.n_items).to(device)
-        lockdown_ids = torch.LongTensor([context['lockdown']] * self.n_items).to(device)
-        
+        user_ids = torch.LongTensor([int(user_id)] * self.n_items).to(device)
+        class_ids = torch.LongTensor([int(context.get("class", 0))] * self.n_items).to(device)
+        semester_ids = torch.LongTensor([int(context.get("semester", 0))] * self.n_items).to(device)
+        lockdown_ids = torch.LongTensor([int(context.get("lockdown", 0))] * self.n_items).to(device)
+
         with torch.no_grad():
-            # Получение предсказаний для всех предметов
             predictions = self.deepfm_model(
                 user_ids, item_ids, class_ids, semester_ids, lockdown_ids
             )
-            
-            # Комбинирование мультикритериальных оценок
-            scores = (
-                0.5 * predictions['rating'] +
-                0.3 * predictions['app'] +
-                0.15 * predictions['data'] +
-                0.05 * predictions['ease']
-            )
-        
-        # Выбор топ-k предметов
-        top_indices = torch.topk(scores, k).indices.cpu().numpy()
+
+            # Веса выходных голов: главный критерий получает 0.5, остальные - по 0.5/(n-1).
+            head_names = list(predictions.keys())
+            if not head_names:
+                scores = torch.zeros(self.n_items, device=device)
+            elif "rating" in predictions:
+                # ITM-Rec: стандартная комбинация по важности.
+                scores = (
+                    0.5 * predictions.get("rating", 0)
+                    + 0.3 * predictions.get("app", 0)
+                    + 0.15 * predictions.get("data", 0)
+                    + 0.05 * predictions.get("ease", 0)
+                )
+            elif "outcome" in predictions:
+                # OULAD: комбинация прокси-критериев, приоритет у Outcome/Mastery.
+                scores = (
+                    0.40 * predictions.get("outcome", 0)
+                    + 0.30 * predictions.get("mastery", 0)
+                    + 0.20 * predictions.get("engagement", 0)
+                    + 0.10 * predictions.get("selfregulation", 0)
+                )
+            else:
+                scores = sum(predictions.values()) / len(head_names)
+
+        top_k = min(int(k), self.n_items)
+        top_indices = torch.topk(scores, top_k).indices.cpu().numpy()
         return top_indices.tolist()
     
     def dqn_recommender(self, user_id: int, context: Dict, k: int = 10) -> List[int]:
@@ -351,8 +370,8 @@ class ComparativeTester:
         rewards_std = [aggregated_results[m]['std']['Cumulative_Reward'] for m in models]
         
         axes[3].bar(models, rewards, yerr=rewards_std, capsize=5, alpha=0.7)
-        axes[3].set_title('Cumulative Reward')
-        axes[3].set_ylabel('Reward')
+        axes[3].set_title('Суммарная награда')
+        axes[3].set_ylabel('Награда')
         axes[3].tick_params(axis='x', rotation=45)
         
         # 5. Coverage
@@ -360,7 +379,7 @@ class ComparativeTester:
         coverages_std = [aggregated_results[m]['std']['Coverage'] for m in models]
         
         axes[4].bar(models, coverages, yerr=coverages_std, capsize=5, alpha=0.7)
-        axes[4].set_title('Coverage (Покрытие каталога)')
+        axes[4].set_title('Coverage (покрытие каталога)')
         axes[4].set_ylabel('Coverage')
         axes[4].tick_params(axis='x', rotation=45)
         
@@ -369,7 +388,7 @@ class ComparativeTester:
         diversities_std = [aggregated_results[m]['std']['Diversity'] for m in models]
         
         axes[5].bar(models, diversities, yerr=diversities_std, capsize=5, alpha=0.7)
-        axes[5].set_title('Diversity (Разнообразие)')
+        axes[5].set_title('Diversity (разнообразие)')
         axes[5].set_ylabel('Diversity')
         axes[5].tick_params(axis='x', rotation=45)
         

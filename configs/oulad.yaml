@@ -1,0 +1,99 @@
+# Конфигурация прототипа для датасета OULAD.
+# Параметры подобраны согласно ТЗ §11.7, §23, §27.
+
+dataset:
+  type: oulad
+  raw_dir: data/raw/oulad
+  processed_dir: data/processed/oulad
+  kaggle_name: anlgrbz/student-demographics-online-education-dataoulad
+  force_rebuild: false
+  catalog:
+    mode: mixed                   # "mixed" | "assessment_only" | "resource_only"
+    top_activity_types: 6         # топ-N типов ресурсов VLE
+    top_assessment_types: 3       # обычно TMA / CMA / Exam
+    bucket_delay: true            # ветки "on_time" vs "late" для assessment
+  min_weeks: 2
+  train_ratio: 0.8
+  val_ratio: 0.1
+  test_ratio: 0.1
+  random_seed: 42
+  proxy_weights:
+    outcome_mastery: 0.70
+    outcome_final_result: 0.30
+    engagement_clicks: 0.35
+    engagement_active_days: 0.25
+    engagement_resource_breadth: 0.20
+    engagement_activity_breadth: 0.10
+    engagement_regularity: 0.10
+    selfreg_ontime: 0.40
+    selfreg_delay: 0.25
+    selfreg_submission: 0.20
+    selfreg_continuity: 0.15
+
+model:
+  deepfm:
+    embedding_dim: 32
+    hidden_dims: [128, 64]
+    dropout: 0.2
+    n_epochs: 10
+    batch_size: 512
+    lr: 0.001
+    weight_decay: 1.0e-5
+    heads: [mastery, engagement, selfregulation, outcome]
+  dqn:
+    state_dim: 96                 # §10.5 ТЗ — OULAD state ≈ 96
+    hidden_dims: [256, 128, 64]
+    dropout: 0.2
+
+training:
+  dqn:
+    gamma: 0.95
+    lr: 0.0005
+    tau: 0.01
+    target_update_freq: 90
+    batch_size: 128
+    epsilon_start: 1.0
+    epsilon_end: 0.05
+    epsilon_decay: 0.9996        # decay идет по шагам, а не по эпизодам
+    n_episodes: 200
+    max_steps_per_episode: 40
+    eval_interval: 50
+    use_action_mask: true
+  replay_buffer:
+    capacity: 50000
+    alpha: 0.6
+    beta: 0.4
+    beta_increment: 0.0005
+
+environment:
+  max_trajectory_length: 40
+  max_recommendations: 30
+  reward_mode: oulad              # инкрементные изменения proxy-критериев
+  use_action_mask: true
+  novelty_weight: 0.10            # §11.10 ТЗ
+  terminal_bonus: true
+  terminal_outcome_weight: 0.5
+  withdrawn_penalty: 0.5
+  proxy_decay: 0.6
+  reward_weights:
+    outcome: 0.35
+    mastery: 0.25
+    engagement: 0.20
+    selfregulation: 0.20
+  enable_low_reward_termination: false
+  low_reward_window: 4
+  low_reward_threshold: -0.1
+
+evaluation:
+  k: 10
+  test_users: 30
+  trajectory_length: 40
+  n_long_term_users: 50
+  n_eval_episodes: 10
+  state_ablation_modes: [full_state, no_context, no_demo, no_context_no_demo]
+  ablation_modes: [full, no_context, no_demo, no_history, no_novelty]
+
+artifacts:
+  models_dir: data/models
+  results_dir: results
+  run_prefix: oulad

@@ -1,55 +1,27 @@
 #!/usr/bin/env python
-"""
-Скрипт для загрузки данных с Kaggle.
+"""Тонкая обёртка — загрузка ITM-Rec или OULAD через CLI.
 
-Использование:
-    python scripts/download_data.py
+Примеры:
+    python scripts/download_data.py --dataset itmrec
+    python scripts/download_data.py --dataset oulad
 """
+
+from __future__ import annotations
 
 import sys
-import os
+from pathlib import Path
 
-# Добавление корневой директории в путь
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from src.data.loaders import download_kaggle_dataset, load_all_data
-
-
-def main():
-    """Основная функция загрузки данных."""
-    print("="*60)
-    print("ЗАГРУЗКА ДАННЫХ С KAGGLE")
-    print("="*60)
-    
-    # Загрузка датасета
-    dataset_name = "irecsys/itmrec"
-    output_dir = "data/raw"
-    
-    print(f"\nЗагрузка датасета: {dataset_name}")
-    print(f"Директория сохранения: {output_dir}")
-    
-    try:
-        data_path = download_kaggle_dataset(dataset_name, output_dir)
-        
-        # Загрузка всех данных для проверки
-        print("\nПроверка загруженных данных...")
-        data = load_all_data(data_path, load_group_ratings=False)
-        
-        print("\n" + "="*60)
-        print("ДАННЫЕ УСПЕШНО ЗАГРУЖЕНЫ!")
-        print("="*60)
-        print(f"\nРасположение: {data_path}")
-        print(f"  - ratings: {data['ratings'].shape}")
-        print(f"  - users: {data['users'].shape}")
-        print(f"  - items: {data['items'].shape}")
-        
-    except Exception as e:
-        print(f"\nОШИБКА при загрузке данных: {e}")
-        print("\nУбедитесь, что:")
-        print("  1. Установлен kagglehub: pip install kagglehub")
-        print("  2. Настроен Kaggle API (kaggle.json в ~/.kaggle/)")
-        sys.exit(1)
+from src.cli import main
 
 
 if __name__ == "__main__":
-    main()
+    dataset = "itmrec"
+    extra = []
+    if len(sys.argv) > 1 and sys.argv[1].startswith("--dataset"):
+        pass  # всё передано пользователем
+    else:
+        # Обратная совместимость: скрипт без аргументов по-старому грузит ITM-Rec
+        extra = ["--dataset", "itmrec"]
+    sys.exit(main(["data", "download", *extra, *sys.argv[1:]]))

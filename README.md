@@ -8,65 +8,87 @@
 
 1. **Многокритериальность и динамичность предпочтений** - одновременный учет образовательной ценности, сложности материала, личных интересов и меняющихся целей студентов
 2. **Оптимизация функции кумулятивного вознаграждения** - формирование образовательных траекторий
-3. **Проблема разреженности данных и коротких коммуникаций** - работа с неполнымии данными о студентах и их предпочтениях
+3. **Проблема разреженности данных и коротких коммуникаций** - работа с неполными данными о студентах и их предпочтениях
 4. **Адаптация к контексту** - учет специализации, семестра и внешних условий, влияющих на выбор учебного материала
 
 ### Компоненты системы
 
 - **DeepFM+SVD++** - гибридная модель для предсказания многокритериальных рейтингов
 - **Dueling DQN** - агент обучения с подкреплением для долгосрочного планирования
-- **EducationalEnvironment** - симулятор образовательной среды с учетом контекста
+- **EducationalEnvironment** - параметры среды с учетом контекста
 
 ## Структура проекта
 
 ```
 rec_sys_edu/
-├── src/                    # Исходный код
-│   ├── data/              # Модуль данных
-│   │   ├── loaders.py     # Загрузка данных с Kaggle
-│   │   ├── preprocessing.py  # Предобработка данных
-│   │   └── dataset.py     # PyTorch Dataset (ITMDataset)
-│   ├── models/            # Модуль моделей
-│   │   ├── deepfm_svdpp.py  # Модель DeepFM+SVD++
-│   │   └── dueling_dqn.py   # Агент Dueling DQN
-│   ├── environment/       # Модуль среды
-│   │   ├── educational_env.py  # Класс EducationalEnvironment
-│   │   └── state_encoder.py    # Кодирование состояний
-│   ├── training/          # Модуль обучения
-│   │   ├── trainer.py     # Класс DQNTrainer
-│   │   ├── replay_buffer.py  # PrioritizedReplayBuffer
-│   │   └── config.py     # Конфигурации обучения
-│   ├── evaluation/        # Модуль оценки
-│   │   ├── metrics.py     # Функции расчета метрик
-│   │   ├── comparative_tester.py  # ComparativeTester
-│   │   ├── long_term_evaluator.py  # LongTermEvaluator
-│   │   └── experiment_runner.py    # ExperimentRunner
-│   └── utils/            # Утилиты
-│       ├── helpers.py     # Вспомогательные функции
-│       └── visualization.py  # Функции визуализации
-├── notebooks/             # Jupyter ноутбуки
-│   ├── 01_data_analysis.ipynb      # Анализ датасета
-│   ├── 02_model_development.ipynb  # Разработка моделей
-│   └── 03_testing.ipynb            # Тестирование системы
-├── scripts/               # Исполняемые скрипты
-│   ├── download_data.py  # Загрузка данных с Kaggle
-│   ├── train_deepfm.py   # Обучение DeepFM+SVD++
-│   ├── train_dqn.py      # Обучение DQN агента
-│   └── evaluate_system.py  # Полная оценка системы
-├── schemes/               # Схемы архитектуры (draw.io XML)
-│   ├── main_scheme.xml   # Общая схема системы
-│   ├── agent.xml         # Архитектура Dueling DQN
-│   ├── data.xml          # Обработка данных
-│   ├── env_train.xml     # Процесс обучения
-│   └── buffer.xml        # Буфер воспроизведения
-├── tests/                 # Тесты
-├── data/                  # Данные и модели
-│   ├── raw/              # Исходные данные
-│   ├── processed/        # Обработанные данные
-│   └── models/           # Сохраненные модели
-├── results/               # Результаты экспериментов
-├── requirements.txt       # Зависимости Python
-└── pyproject.toml        # Конфигурация проекта
+├── configs/                 # YAML-конфигурации ITM-Rec и OULAD
+│   ├── itmrec.yaml          # Конфиг базового сценария (ITM-Rec)
+│   └── oulad.yaml           # Конфиг расширенного сценария (OULAD)
+├── src/                     # Исходный код
+│   ├── api.py               # Унифицированный Python API (build_config, train_*, evaluate_system)
+│   ├── cli.py               # Единая CLI (`python -m src.cli ...`)
+│   ├── data/                # Модуль данных
+│   │   ├── loaders.py       # Загрузка и диспетчер `load_dataset(type)`
+│   │   ├── preprocess_itmrec.py  # ITM-Rec → DatasetBundle
+│   │   ├── preprocess_oulad.py   # OULAD → DatasetBundle (+ mixed-step catalog)
+│   │   ├── oulad_reports.py      # Таблицы и графики EDA для OULAD
+│   │   ├── schemas.py            # DatasetBundle
+│   │   └── dataset.py            # PyTorch Dataset (ITMDataset)
+│   ├── models/
+│   │   ├── deepfm_svdpp.py       # DeepFM+SVD++ с save/load_checkpoint
+│   │   └── dueling_dqn.py        # Dueling DQN с action-mask
+│   ├── environment/
+│   │   ├── educational_env.py    # Среда ITM-Rec (reward, novelty, termination)
+│   │   ├── oulad_env.py          # Среда OULAD (proxy-reward, terminal bonus)
+│   │   ├── oulad_state.py        # Кодирование 96-мерного state OULAD
+│   │   ├── action_mask.py        # Action mask OULAD (week, kind, completed)
+│   │   ├── reward.py             # Централизованные функции наград
+│   │   └── state_encoder.py      # ITM-Rec state encoder
+│   ├── training/
+│   │   ├── trainer.py            # DQNTrainer (mask-aware TD-target)
+│   │   ├── train_static.py       # Пайплайн DeepFM+SVD++
+│   │   ├── train_dqn.py          # Пайплайн DQN (ITM-Rec и OULAD)
+│   │   ├── replay_buffer.py      # PrioritizedReplayBuffer
+│   │   └── config.py             # ITMREC_DEFAULTS / OULAD_DEFAULTS
+│   ├── evaluation/
+│   │   ├── metrics.py                # Короткие и долгосрочные метрики
+│   │   ├── adaptability.py           # AdaptabilityScore, Stability (H1)
+│   │   ├── comparative_tester.py     # H2.1 vs baselines
+│   │   ├── long_term_evaluator.py    # CDR, Retention, LearningSlope (H2)
+│   │   ├── novelty_ablation.py       # Ablation no_context/no_demo/no_novelty (H3)
+│   │   ├── statistics.py             # Welch, Wilcoxon, Cohen's d, bootstrap CI
+│   │   ├── trajectory_visualizer.py  # Визуализация reward/coverage/novelty
+│   │   └── system_evaluator.py       # Оркестратор H1/H2/H3
+│   └── utils/
+│       ├── helpers.py                # prepare_run, save_metrics, set_seed, device
+│       └── visualization.py          # Вспомогательные графики
+├── notebooks/               # Подробнее: notebooks/README.md
+│   ├── 00_quickstart.ipynb           # Быстрый старт: полный цикл (данные → DeepFM → DQN → H1–H3 → визуализация)
+│   ├── 01_data_analysis.ipynb        # EDA ITM-Rec
+│   ├── 02_model_development.ipynb    # Разработка моделей (устаревший, см. 00 или src.api)
+│   ├── 03_testing.ipynb              # Тестирование (устаревший, см. 06/07)
+│   ├── 04_oulad_data.ipynb           # EDA и DatasetBundle для OULAD
+│   ├── 05_oulad_model.ipynb          # Обучение DeepFM+DQN для OULAD
+│   ├── 06_hypotheses.ipynb           # H1/H2/H3 через api.evaluate_system
+│   └── 07_trajectories.ipynb         # Визуализация траекторий
+├── scripts/                 # Тонкие обертки над CLI (для обратной совместимости)
+│   ├── download_data.py
+│   ├── prepare_oulad.py
+│   ├── analyze_oulad.py
+│   ├── train_deepfm.py
+│   ├── train_dqn.py
+│   └── evaluate_system.py
+├── tests/                   # pytest-инварианты (state_dim, mask, reward, checkpoint)
+│   ├── test_invariants.py
+│   └── test_dqn_mask.py
+├── schemes/                 # Схемы архитектуры (draw.io XML)
+├── data/
+│   ├── raw/                 # Исходные данные (data/raw/oulad для OULAD)
+│   ├── processed/           # Обработанные данные + EDA OULAD
+│   └── models/              # Чекпоинты DeepFM / DQN
+├── results/                 # Результаты экспериментов (run-директории)
+├── requirements.txt
+└── pyproject.toml
 ```
 
 ## Установка и настройка
@@ -105,44 +127,144 @@ pip install -e .
 
 ## Быстрый старт
 
-Запустить систему можно как с помощью ноутбуков, так и из подготовленных скриптов.
+Прототип управляется единым CLI (`python -m src.cli ...`) и симметричным
+Python API (`src.api`). Все ключевые сценарии - подготовка данных, EDA,
+обучение, оценка гипотез - поддерживают оба датасета: **ITM-Rec** (базовый)
+и **OULAD** (расширенный).
 
-### 1. Загрузка данных
-
-```bash
-# Загрузка датасета ITM-Rec с Kaggle
-python scripts/download_data.py
-```
-
-### 2. Обучение моделей
+### 1. Подготовка данных
 
 ```bash
-# Обучение DeepFM+SVD++
-python scripts/train_deepfm.py
+# ITM-Rec (Kaggle)
+python -m src.cli data download --dataset itmrec
+python -m src.cli data prepare  --dataset itmrec --config configs/itmrec.yaml
 
-# Обучение DQN агента
-python scripts/train_dqn.py --episodes 200
+# OULAD (Open University Learning Analytics)
+python -m src.cli data download --dataset oulad
+python -m src.cli data prepare  --dataset oulad --config configs/oulad.yaml
+
+# Разведочный анализ OULAD: CSV-таблицы + PNG-графики
+python -m src.cli data analyze  --dataset oulad
 ```
 
-### 3. Оценка системы
+### 2. Обучение
 
 ```bash
-# Полная оценка системы
-python scripts/evaluate_system.py --test-users 20
+# DeepFM+SVD++ (multi-head: Rating/App/Data/Ease для ITM-Rec, proxy-критерии для OULAD)
+python -m src.cli train static --dataset itmrec --config configs/itmrec.yaml
+python -m src.cli train static --dataset oulad  --config configs/oulad.yaml
+
+# Dueling DQN поверх DeepFM (action-mask, prioritized replay)
+python -m src.cli train dqn --dataset itmrec \
+    --deepfm-checkpoint data/models/deepfm_itmrec_best.pth
+python -m src.cli train dqn --dataset oulad \
+    --deepfm-checkpoint data/models/deepfm_oulad_best.pth
 ```
 
-### Использование ноутбуков
+### 3. Оценка гипотез H1/H2/H3
 
 ```bash
-# Этап 1: Анализ данных
-jupyter notebook notebooks/01_data_analysis.ipynb
+python -m src.cli evaluate --dataset itmrec --hypothesis all \
+    --deepfm-checkpoint data/models/deepfm_itmrec_best.pth \
+    --dqn-checkpoint    data/models/dqn_itmrec_best.pth
 
-# Этап 2: Разработка моделей
-jupyter notebook notebooks/02_model_development.ipynb
-
-# Этап 3: Тестирование
-jupyter notebook notebooks/03_testing.ipynb
+python -m src.cli evaluate --dataset oulad --hypothesis H2 \
+    --deepfm-checkpoint data/models/deepfm_oulad_best.pth \
+    --dqn-checkpoint    data/models/dqn_oulad_best.pth
 ```
+
+### 4. Использование ноутбуков
+
+Рекомендуемая точка входа — `notebooks/00_quickstart.ipynb` (полный цикл за 10–15 минут; ITM-Rec или OULAD по конфигу). Детальные сценарии и описание API в каталоге см. [notebooks/README.md](notebooks/README.md).
+
+```bash
+jupyter notebook notebooks/00_quickstart.ipynb   # Быстрый старт (рекомендуется)
+jupyter notebook notebooks/04_oulad_data.ipynb   # EDA + DatasetBundle OULAD
+jupyter notebook notebooks/05_oulad_model.ipynb  # Обучение DeepFM+DQN для OULAD
+jupyter notebook notebooks/06_hypotheses.ipynb   # Гипотезы H1/H2/H3 (оба датасета)
+jupyter notebook notebooks/07_trajectories.ipynb # Визуализация траекторий
+```
+
+### 5. Python API (эквивалент CLI)
+
+```python
+from src import api
+
+config = api.build_config("oulad", yaml_path="configs/oulad.yaml")
+run_dir = api.prepare_run(config, run_name="oulad_experiment")
+
+static = api.train_static("oulad", config=config, run_dir=run_dir)
+dqn = api.train_dqn(
+    "oulad",
+    config=config,
+    run_dir=run_dir,
+    deepfm_checkpoint=static["history"]["best_checkpoint"],
+)
+results = api.evaluate_system(
+    "oulad",
+    hypothesis="all",
+    config=config,
+    run_dir=run_dir,
+    deepfm_checkpoint=static["history"]["best_checkpoint"],
+    dqn_checkpoint=dqn["checkpoint"],
+)
+```
+
+### 6. Вспомогательные скрипты (обертки над CLI)
+
+Старые вызовы `python scripts/*.py` продолжают работать:
+
+```bash
+python scripts/download_data.py --dataset oulad
+python scripts/prepare_oulad.py --config configs/oulad.yaml
+python scripts/analyze_oulad.py
+python scripts/train_deepfm.py --dataset oulad
+python scripts/train_dqn.py    --dataset oulad --episodes 200
+python scripts/evaluate_system.py --dataset oulad --hypothesis all \
+    --deepfm-checkpoint ... --dqn-checkpoint ...
+```
+
+## Артефакты и воспроизводимость
+
+Каждая команда `train/evaluate` создает новую директорию `run` в `results/`:
+
+```
+results/<run_name>_<timestamp>/
+├── config.yaml                       # фактическая конфигурация запуска
+├── logs/                             # логи обучения/оценки
+├── checkpoints/                      # DeepFM / DQN чекпоинты
+├── tables/
+│   ├── deepfm_history.json           # история train_static
+│   ├── dqn_history.json              # история train_dqn + final_evaluation
+│   ├── h1_adaptability.json          # H1 метрики
+│   ├── h2_long_term.json             # H2 метрики
+│   ├── h3_novelty_ablation.json      # H3 ablation
+│   └── evaluation_summary.json       # сводный отчет
+└── figures/                          # графики reward/coverage/novelty
+```
+
+Для OULAD команда `data analyze` генерирует таблицы и графики в
+`data/processed/oulad/{tables,figures}/`.
+
+Используются фиксированные параметры seed (см. `seed` в YAML) и сохраняется
+фактический `config.yaml` в run-директории, что обеспечивает
+воспроизводимость результатов.
+
+### pytest-инварианты
+
+Ключевые контракты системы защищены набором автоматизированных тестов:
+
+```bash
+python -m pytest tests/ -q
+```
+
+В наборе тестов проверяются:
+* размерности state-векторов (ITM-Rec = 65, OULAD = 96);
+* корректность action-mask (завершенные assessment, Exam в финальной фазе,
+  защита от полностью нулевой маски);
+* монотонность и формула `calculate_itmrec_reward` / `calculate_oulad_*`;
+* `DuelingDQN.get_action(..., action_mask=...)`;
+* roundtrip `DeepFMSVDPlusPlus.save_checkpoint` → `load_checkpoint`.
 
 ## Методика решения
 
@@ -164,7 +286,7 @@ jupyter notebook notebooks/03_testing.ipynb
 
 ### 1. Модель DeepFM+SVD++
 
-Гибридная модель объединяет три компонента для предсказания многокритериальных рейтингов:
+Гибридная модель объединяет три компонента для прогнозирования многокритериальных рейтингов:
 
 #### 1.1. Factorization Machine (FM)
 
@@ -253,9 +375,9 @@ $$Q(s, a) = V(s) + \left( A(s, a) - \frac{1}{|\mathcal{A}|} \sum_{a'} A(s, a') \
 
 Это позволяет агенту лучше оценивать ценность состояний независимо от конкретных действий.
 
-#### 2.4. Temporal Difference Learning
+#### 2.4. Обучение с использованием временных разностей (Temporal Difference Learning)
 
-Обучение происходит через минимизацию TD-ошибки:
+Оптимизация выполняется путем минимизации ошибки временной разности:
 
 $$\mathcal{L} = \mathbb{E}_{(s, a, r, s', d) \sim \mathcal{D}} \left[ \left( r + \gamma \max_{a'} Q_{\text{target}}(s', a') \cdot (1 - d) - Q(s, a) \right)^2 \right]$$
 
@@ -265,29 +387,29 @@ $$\mathcal{L} = \mathbb{E}_{(s, a, r, s', d) \sim \mathcal{D}} \left[ \left( r +
 - $d$ - флаг завершения эпизода
 - $\mathcal{D}$ - буфер воспроизведения опыта
 
-#### 2.5. Prioritized Experience Replay
+#### 2.5. Приоритизированное воспроизведение опыта (Prioritized Experience Replay)
 
-Приоритеты переходов основаны на TD-ошибке:
+Приоритеты переходов в буфере определяются на основе величины ошибки временной разности:
 
 $$P(i) = \frac{p_i^{\alpha}}{\sum_k p_k^{\alpha}}$$
 
 где $p_i = |\delta_i| + \epsilon$ - приоритет перехода $i$, $\alpha$ - параметр важности (0.6).
 
-Важность выборки (importance sampling):
+Компенсация смещения при выборке из приоритизированного буфера:
 
 $$w_i = \left( \frac{1}{N} \cdot \frac{1}{P(i)} \right)^{\beta}$$
 
 где $\beta$ - параметр компенсации (начинается с 0.4, увеличивается до 1.0).
 
-#### 2.6. Обновление целевой сети
+#### 2.6. Синхронизация целевой сети
 
-Используется комбинация жесткого и мягкого обновления:
-- **Жесткое обновление** (каждые 100 шагов): $\theta_{\text{target}} \leftarrow \theta$
-- **Мягкое обновление** (остальные шаги): $\theta_{\text{target}} \leftarrow \tau \theta + (1 - \tau) \theta_{\text{target}}$
+Применяется комбинация двух стратегий обновления целевой сети:
+- **Полное обновление** (каждые 100 шагов): $\theta_{\text{target}} \leftarrow \theta$
+- **Частичное обновление** (остальные шаги): $\theta_{\text{target}} \leftarrow \tau \theta + (1 - \tau) \theta_{\text{target}}$
 
 где $\tau = 0.01$ - коэффициент мягкого обновления.
 
-#### 2.7. ε-жадная стратегия исследования
+#### 2.7. Стратегия исследования: ε-жадный алгоритм
 
 $$\pi(a|s) = \begin{cases}
 \text{случайное действие} & \text{с вероятностью } \epsilon \\
@@ -296,29 +418,29 @@ $$\pi(a|s) = \begin{cases}
 
 где $\epsilon$ уменьшается от 1.0 до 0.01 с коэффициентом затухания 0.995.
 
-### 3. Симуляция образовательной среды
+### 3. Образовательная среда моделирования
 
-Среда `EducationalEnvironment` моделирует взаимодействие студента с системой:
+Компонент `EducationalEnvironment` реализует интерпретатор взаимодействия студента с системой:
 
-1. **Симуляция обратной связи**: использует реальные рейтинги из датасета или предсказания DeepFM+SVD++
-2. **Расчет вознаграждения**: многокритериальная функция с учетом контекста
-3. **Обновление траектории**: сохранение истории взаимодействий
-4. **Условия завершения**: эпизод завершается при:
+1. **Генерация обратной связи**: использует фактические оценки из датасета или предсказания модели DeepFM+SVD++
+2. **Вычисление вознаграждения**: многокритериальная функция с адаптацией к контексту
+3. **Ведение истории**: накопление истории взаимодействий студента
+4. **Условия завершения сеанса**: сеанс заканчивается при выполнении одного из условий:
    - Достижении максимальной длины траектории (10 шагов)
    - Низком среднем вознаграждении (< 0.3)
    - Достижении достаточного разнообразия (≥ 5 уникальных рекомендаций)
 
-## Техническая архитектура
+## Архитектура системы
 
-### Общая схема системы
+### Описание системы
 
-Схемы архитектуры представлены в формате XML для [draw.io](https://app.diagrams.net/). Для просмотра:
+Диаграммы архитектуры реализованы в формате XML для приложения [draw.io](https://app.diagrams.net/). Процедура просмотра:
 
-1. Откройте [draw.io](https://app.diagrams.net/)
-2. File → Open from → Device
-3. Выберите файл из папки `schemes/`
+1. Откройте веб-приложение [draw.io](https://app.diagrams.net/)
+2. Выберите File → Open from → Device
+3. Загрузите файл из папки `schemes/`
 
-**Файлы схем:**
+**Доступные диаграммы:**
 - `schemes/main_scheme.xml` - Общая архитектура гибридной системы
 - `schemes/agent.xml` - Детальная архитектура Dueling DQN агента
 - `schemes/data.xml` - Формирование вектора состояния
@@ -337,33 +459,33 @@ $$\pi(a|s) = \begin{cases}
    - Q-значений для всех возможных действий
    - ε-жадной стратегии выбора
 
-### Архитектура Dueling DQN
+### Архитектура агента Dueling DQN
 
-*Схема: `schemes/agent.xml` (открыть в [draw.io](https://app.diagrams.net/))*
+*Диаграмма: `schemes/agent.xml` (просмотр в [draw.io](https://app.diagrams.net/))*
 
-Архитектура включает:
+Архитектура состоит из следующих компонентов:
 
-1. **Feature Layers** (общие признаки):
+1. **Слои признаков** (общее представление):
    - Linear(65 → 256) → BatchNorm → ReLU → Dropout(0.2)
    - Linear(256 → 128) → BatchNorm → ReLU → Dropout(0.2)
    - Linear(128 → 64) → BatchNorm → Dropout(0.2)
 
-2. **Value Stream** (ценность состояния):
+2. **Поток ценности** (оценка состояния):
    - Linear(64 → 32) → ReLU → Linear(32 → 1)
    - Выход: $V(s)$
 
-3. **Advantage Stream** (преимущество действий):
+3. **Поток преимуществ** (оценка действий):
    - Linear(64 → 32) → ReLU → Linear(32 → 70)
    - Выход: $A(s, a)$ для всех 70 действий
 
-4. **Комбинация Dueling**:
+4. **Функция агрегации (Dueling)**:
    $$Q(s, a) = V(s) + A(s, a) - \frac{1}{70} \sum_{a'} A(s, a')$$
 
-### Формирование состояния
+### Конструирование вектора состояния
 
-*Схема: `schemes/data.xml` (открыть в [draw.io](https://app.diagrams.net/))*
+*Диаграмма: `schemes/data.xml` (просмотр в [draw.io](https://app.diagrams.net/))*
 
-Состояние формируется из 5 компонентов:
+Вектор состояния состоит из пяти компонентов:
 
 1. **Эмбеддинг студента** (32 dims): извлекается из `model.user_emb_fm(u)`
 2. **Контекст** (10 dims): OneHot кодирование Class (3) + Semester (2) + Lockdown (3) + time_in_semester (1) + success_rate (1)
@@ -373,42 +495,42 @@ $$\pi(a|s) = \begin{cases}
 
 **Итого**: 32 + 10 + 6 + 15 + 2 = **65 измерений**
 
-### Процесс обучения
+### Цикл обучения
 
-*Схема: `schemes/env_train.xml` (открыть в [draw.io](https://app.diagrams.net/))*
+*Диаграмма: `schemes/env_train.xml` (просмотр в [draw.io](https://app.diagrams.net/))*
 
-Цикл обучения включает:
+Процесс обучения включает следующие этапы:
 
-1. **Взаимодействие со средой**:
-   - Агент получает состояние $s_t$
-   - Выбирает действие $a_t$ через ε-жадную стратегию
-   - Среда возвращает $(r_t, s_{t+1}, \text{done})$
+1. **Сбор данных из среды**:
+   - Агент воспринимает состояние $s_t$
+   - Выбирает действие $a_t$ используя ε-жадный алгоритм
+   - Окружение возвращает результат $(r_t, s_{t+1}, \text{done})$
 
-2. **Сохранение опыта**:
-   - Переход $(s_t, a_t, r_t, s_{t+1}, \text{done})$ сохраняется в буфер с приоритетом
+2. **Запись опыта**:
+   - Переход $(s_t, a_t, r_t, s_{t+1}, \text{done})$ сохраняется в приоритизированный буфер
 
-3. **Обучение**:
-   - Выборка батча с учетом приоритетов
-   - Вычисление TD-ошибки
+3. **Оптимизация**:
+   - Выборка батча из буфера с учетом приоритета
+   - Вычисление ошибки временной разности
    - Обновление приоритетов в буфере
-   - Оптимизация Q-сети через backpropagation
+   - Градиентный спуск для обновления весов Q-сети
 
-### Буфер воспроизведения
+### Механизм приоритизированного буфера воспроизведения
 
-*Схема: `schemes/buffer.xml` (открыть в [draw.io](https://app.diagrams.net/))*
+*Диаграмма: `schemes/buffer.xml` (просмотр в [draw.io](https://app.diagrams.net/))*
 
-Prioritized Replay Buffer реализует:
+Приоритизированный буфер воспроизведения реализует следующий функционал:
 
 - **Емкость**: 10,000 переходов
 - **Приоритеты**: основаны на TD-ошибке
 - **Выборка**: пропорциональна приоритетам с параметром $\alpha = 0.6$
 - **Важность**: компенсация смещения через importance sampling с $\beta$ (0.4 → 1.0)
 
-## Метрики оценки
+## Показатели качества
 
-Система оценивается по следующим метрикам:
+Система оценивается посредством следующих показателей:
 
-### Краткосрочные метрики
+### Метрики краткосрочного качества
 
 - **Precision@K**: доля релевантных рекомендаций среди топ-K
 - **Recall@K**: доля найденных релевантных предметов
@@ -417,56 +539,67 @@ Prioritized Replay Buffer реализует:
 - **Diversity**: разнообразие рекомендаций (косинусное расстояние между предметами)
 - **Novelty**: средняя обратная популярность рекомендованных предметов
 
-### Долгосрочные метрики
+### Метрики долгосрочного качества
 
-- **Cumulative Discounted Reward (CDR)**: 
+- **Совокупное дисконтированное вознаграждение (CDR)**: 
   $$\text{CDR} = \sum_{t=0}^{T} \gamma^t r_t$$
   
-- **Retention Rate**: доля шагов с наградой выше порога (0.5)
+- **Коэффициент удержания**: доля этапов с вознаграждением выше установленного порога (0.5)
 
-- **Learning Slope**: тренд улучшения наград во времени (линейная регрессия по сегментам траектории)
+- **Тренд улучшения вознаграждения**: пространственная тенденция возрастания вознаграждения во времени (вычисляется линейной регрессией по участкам траектории)
 
-- **Coverage Progress**: прогресс покрытия каталога во времени
+- **Динамика расширения каталога**: количество уникальных предметов покрытия во времени
 
-## Ноутбуки
+## Jupyter ноутбуки
 
-Проект включает три Jupyter ноутбука для пошагового выполнения:
+Интерактивные сценарии строятся на `src.api` (см. также [notebooks/README.md](notebooks/README.md)).
 
-1. **`notebooks/01_data_analysis.ipynb`** - Анализ датасета ITM-Rec
-   - Загрузка данных с Kaggle
-   - EDA и визуализации распределений
-   - Корреляционный анализ критериев
-   - Анализ влияния контекстных переменных (Class, Semester, Lockdown)
+### Быстрый старт
 
-2. **`notebooks/02_model_development.ipynb`** - Разработка моделей
-   - Предобучение DeepFM+SVD++
-   - Создание среды EducationalEnvironment
-   - Разработка Dueling DQN агента
-   - Настройка пайплайна обучения
+- **`notebooks/00_quickstart.ipynb`** — рекомендуемая точка входа: конфиг и данные (ITM-Rec или OULAD), обучение DeepFM+SVD++ и Dueling DQN, оценка гипотез H1/H2/H3, визуализация траекторий и сводные таблицы/графики в `results/`.
 
-3. **`notebooks/03_testing.ipynb`** - Тестирование системы
-   - Базовые эксперименты обучения
-   - Сравнительное тестирование с базовыми методами
-   - Долгосрочная оценка полезности
-   - Анализ адаптивности к изменяющимся предпочтениям
+### Базовый датасет ITM-Rec
 
-## Зависимости
+- **`notebooks/01_data_analysis.ipynb`** — разведочный анализ ITM-Rec: распределения по четырем критериям, влияние Class, Semester, Lockdown, корреляции и демографические профили.
+- **`notebooks/02_model_development.ipynb`** — *устаревший* пошаговый разбор обучения DeepFM, среды и DQN; для обучения предпочтительны `00_quickstart` или CLI/API.
+- **`notebooks/03_testing.ipynb`** — *устаревший* набор базовых прогонов и сравнений с random/popularity; для оценки предпочтительны `06_hypotheses` и `07_trajectories`.
 
-Основные библиотеки:
-- `torch>=2.0.0` - PyTorch для глубокого обучения
-- `pandas>=2.0.0`, `numpy>=1.24.0` - Работа с данными
-- `scikit-learn>=1.3.0` - ML утилиты и метрики
-- `matplotlib>=3.7.0`, `seaborn>=0.12.0` - Визуализация
-- `kagglehub>=0.2.0` - Загрузка датасетов с Kaggle
-- `tqdm>=4.65.0` - Прогресс-бары
-- `scipy>=1.10.0` - Статистические функции
+### Расширенный сценарий OULAD
+
+- **`notebooks/04_oulad_data.ipynb`** — EDA OULAD: структура таблиц, прокси-критерии (Mastery, Engagement, SelfRegulation, Outcome), VLE/assessment и временная динамика.
+- **`notebooks/05_oulad_model.ipynb`** — полный цикл для OULAD: подготовка данных, DeepFM на недельных траекториях, DQN с action mask и долгосрочная оценка.
+
+### Гипотезы и визуализация
+
+- **`notebooks/06_hypotheses.ipynb`** — формальная проверка H1 (адаптивность к контексту, AdaptabilityScore), H2 (CDR, удержание, learning slope, статистика), H3 (абляция: контекст, демография, новизна) для выбранного датасета.
+- **`notebooks/07_trajectories.ipynb`** — качественный анализ: накопленные награды, сравнение DQN с baseline (random, popularity, static), переходы, охват и новизна.
+
+### Типовые сценарии (время ориентировочно)
+
+| Цель | Ноутбуки |
+|------|----------|
+| Минимум: один полный прогон | `00_quickstart` |
+| Глубина по гипотезам | `00_quickstart` → `06_hypotheses` |
+| Фокус на OULAD | `04_oulad_data` → `00_quickstart` (конфиг OULAD) → `06_hypotheses` |
+| Качество траекторий | `07_trajectories` (после обучения) |
+
+## Необходимые зависимости
+
+Основные библиотеки и модули:
+- `torch>=2.0.0` - Фреймворк для глубокого обучения
+- `pandas>=2.0.0`, `numpy>=1.24.0` - Инструменты обработки данных
+- `scikit-learn>=1.3.0` - Утилиты машинного обучения и вычисления метрик
+- `matplotlib>=3.7.0`, `seaborn>=0.12.0` - Библиотеки для визуализации
+- `kagglehub>=0.2.0` - Загрузка датасетов из Kaggle
+- `tqdm>=4.65.0` - Индикаторы прогресса
+- `scipy>=1.10.0` - Статистические функции и алгоритмы
 
 Полный список в `requirements.txt`.
 
-## Лицензия
+## Правовая информация
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Проект распространяется в соответствии с лицензией MIT - см. файл [LICENSE](LICENSE) для полной информации.
 
-## Автор
+## Разработчик
 
-Золотарева Анастасия
+Анастасия Золотарева

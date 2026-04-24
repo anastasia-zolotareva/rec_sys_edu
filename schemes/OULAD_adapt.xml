@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="nRGZj8pq_eBkJynuiRAi">
+    <mxGraphModel dx="1632" dy="1244" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="X6EasLykEpVnjMH_RvsM-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=20;fontFamily=Times New Roman;strokeWidth=2;" value="student-presentation&#xa;(id_student, code_module, code_presentation)" vertex="1">
+          <mxGeometry height="100" width="300" x="120" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=20;fontFamily=Times New Roman;strokeWidth=2;" value="Каталог mixed-step&#xa;• assessment-step&#xa;• VLE-step&#xa;• week/phase-aware" vertex="1">
+          <mxGeometry height="150" width="300" x="120" y="440" as="geometry" />
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=middle;fontSize=18;fontFamily=Times New Roman;strokeWidth=2;spacingLeft=12;" value="DeepFM+SVD++ для OULAD&#xa;Входы: student_presentation_id, mixed_step_id, module, presentation, step_family, type, week, deadline_gap, weight&#xa;Выходы: Mastery_pred, Engagement_pred, SelfRegulation_pred, Outcome_pred" vertex="1">
+          <mxGeometry height="220" width="520" x="500" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-5" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=middle;fontSize=18;fontFamily=Times New Roman;strokeWidth=2;spacingLeft=12;" value="Состояние S_t (≈96)&#xa;• embedding student-presentation&#xa;• context module/presentation&#xa;• progress + deadline features&#xa;• demographics + academic background&#xa;• history of mixed-step&#xa;• temporal scalars" vertex="1">
+          <mxGeometry height="220" width="330" x="1100" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=20;fontFamily=Times New Roman;strokeWidth=2;" value="Action mask&#xa;A(s_t) ⊂ A&#xa;доступны только допустимые mixed-step" vertex="1">
+          <mxGeometry height="100" width="330" x="1100" y="520" as="geometry" />
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-7" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=22;fontStyle=1;fontFamily=Times New Roman;strokeWidth=2;" value="Dueling DQN&#xa;Q(s_t, a)&#xa;с учетом mask" vertex="1">
+          <mxGeometry height="120" width="260" x="1500" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-8" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=20;fontFamily=Times New Roman;strokeWidth=2;" value="Действие a_t&#xa;выбранный mixed-step" vertex="1">
+          <mxGeometry height="90" width="260" x="1500" y="520" as="geometry" />
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-9" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=middle;fontSize=18;fontFamily=Times New Roman;strokeWidth=2;spacingLeft=12;" value="Награда r_t&#xa;0.45·ΔMastery + 0.20·ΔEngagement + 0.25·ΔSelfRegulation + 0.10·Novelty&#xa;+ terminal bonus по Outcome" vertex="1">
+          <mxGeometry height="140" width="520" x="500" y="550" as="geometry" />
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-10" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=middle;fontSize=18;fontFamily=Times New Roman;strokeWidth=2;spacingLeft=12;" value="Обновление среды&#xa;• progress / current week&#xa;• completed assessments&#xa;• on-time streak / delays&#xa;• available_actions_mask&#xa;• done_terminal / done_truncated" vertex="1">
+          <mxGeometry height="170" width="660" x="935" y="770" as="geometry" />
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-11" edge="1" parent="1" source="X6EasLykEpVnjMH_RvsM-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="X6EasLykEpVnjMH_RvsM-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-12" edge="1" parent="1" source="X6EasLykEpVnjMH_RvsM-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="X6EasLykEpVnjMH_RvsM-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-13" edge="1" parent="1" source="X6EasLykEpVnjMH_RvsM-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="X6EasLykEpVnjMH_RvsM-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-14" edge="1" parent="1" source="X6EasLykEpVnjMH_RvsM-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="X6EasLykEpVnjMH_RvsM-7">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1460" y="370" />
+              <mxPoint x="1460" y="400" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-15" edge="1" parent="1" source="X6EasLykEpVnjMH_RvsM-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="X6EasLykEpVnjMH_RvsM-7">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1460" y="570" />
+              <mxPoint x="1460" y="400" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-16" edge="1" parent="1" source="X6EasLykEpVnjMH_RvsM-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="X6EasLykEpVnjMH_RvsM-8">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1680" y="490" />
+              <mxPoint x="1680" y="490" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-17" edge="1" parent="1" source="X6EasLykEpVnjMH_RvsM-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="X6EasLykEpVnjMH_RvsM-9">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1630" y="510" />
+              <mxPoint x="1060" y="510" />
+              <mxPoint x="1060" y="620" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-18" edge="1" parent="1" source="X6EasLykEpVnjMH_RvsM-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="X6EasLykEpVnjMH_RvsM-10">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1630" y="730" />
+              <mxPoint x="1250" y="730" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-19" edge="1" parent="1" source="X6EasLykEpVnjMH_RvsM-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="X6EasLykEpVnjMH_RvsM-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-20" edge="1" parent="1" source="X6EasLykEpVnjMH_RvsM-10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="X6EasLykEpVnjMH_RvsM-5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1080" y="450" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="X6EasLykEpVnjMH_RvsM-21" edge="1" parent="1" source="X6EasLykEpVnjMH_RvsM-10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" target="X6EasLykEpVnjMH_RvsM-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

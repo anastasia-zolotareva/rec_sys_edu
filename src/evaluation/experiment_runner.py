@@ -43,7 +43,8 @@ class ExperimentRunner:
     def run_training_experiment(
         self,
         n_episodes: int = 100,
-        eval_interval: int = 10
+        eval_interval: int = 10,
+        max_steps_per_episode: Optional[int] = None,
     ) -> Dict[str, List]:
         """
         Эксперимент по обучению.
@@ -51,6 +52,7 @@ class ExperimentRunner:
         Args:
             n_episodes: Количество эпизодов обучения
             eval_interval: Интервал оценки (каждые N эпизодов)
+            max_steps_per_episode: Максимум шагов в обучающем эпизоде.
         
         Returns:
             Словарь с результатами обучения
@@ -59,7 +61,9 @@ class ExperimentRunner:
         
         for episode in tqdm(range(n_episodes)):
             # Обучение на одном эпизоде
-            episode_reward, avg_loss = self.trainer.train_episode()
+            episode_reward, avg_loss = self.trainer.train_episode(
+                max_steps=max_steps_per_episode
+            )
             
             # Сохранение результатов
             self.results['training_rewards'].append(episode_reward)
