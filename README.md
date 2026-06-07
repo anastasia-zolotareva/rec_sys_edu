@@ -59,6 +59,9 @@ rec_sys_edu/
 │   │   ├── statistics.py             # Welch, Wilcoxon, Cohen's d, bootstrap CI
 │   │   ├── trajectory_visualizer.py  # Визуализация reward/coverage/novelty
 │   │   └── system_evaluator.py       # Оркестратор H1/H2/H3
+│   ├── visualization/
+│   │   ├── student_trajectories.py   # Анализ и визуализация траекторий студентов (профили, динамика метрик)
+│   │   └── __init__.py
 │   └── utils/
 │       ├── helpers.py                # prepare_run, save_metrics, set_seed, device
 │       └── visualization.py          # Вспомогательные графики
@@ -70,7 +73,9 @@ rec_sys_edu/
 │   ├── 04_oulad_data.ipynb           # EDA и DatasetBundle для OULAD
 │   ├── 05_oulad_model.ipynb          # Обучение DeepFM+DQN для OULAD
 │   ├── 06_hypotheses.ipynb           # H1/H2/H3 через api.evaluate_system
-│   └── 07_trajectories.ipynb         # Визуализация траекторий
+│   ├── 07_trajectories.ipynb         # Визуализация траекторий
+│   ├── 08_student_profile_trajectories.ipynb  # Профили студентов и их траектории
+│   └── 09_feature_importance_analysis.ipynb  # SHAP анализ значимости признаков (DeepFM для ITM-Rec и OULAD)
 ├── scripts/                 # Тонкие обертки над CLI (для обратной совместимости)
 │   ├── download_data.py
 │   ├── prepare_oulad.py
@@ -573,6 +578,15 @@ $$\pi(a|s) = \begin{cases}
 
 - **`notebooks/06_hypotheses.ipynb`** — формальная проверка H1 (адаптивность к контексту, AdaptabilityScore), H2 (CDR, удержание, learning slope, статистика), H3 (абляция: контекст, демография, новизна) для выбранного датасета.
 - **`notebooks/07_trajectories.ipynb`** — качественный анализ: накопленные награды, сравнение DQN с baseline (random, popularity, static), переходы, охват и новизна.
+- **`notebooks/08_student_profile_trajectories.ipynb`** — визуализация работы системы для **конкретных студентов**: выбор репрезентативных студентов с разными профилями, симуляция их образовательных траекторий (рекомендации + динамика метрик), сохранение профильных карточек и графиков для презентации. Добавлен для демонстрации информативности и адаптивности системы на примерах реальных студентов.
+
+### Интерпретируемость моделей
+
+- **`notebooks/09_feature_importance_analysis.ipynb`** — анализ интерпретируемости с использованием SHAP:
+  - SHAP анализ значимости признаков для DeepFM+SVD++ (ITM-Rec и OULAD)
+  - Визуализация важности компонентов для каждого выхода модели
+  - Результаты сохраняются в `notebooks/results/feature_importance_oulad/`
+  - **Примечание**: анализ значимости компонентов состояния DQN реализован в скриптах (`scripts/run_importance_analysis.py` и `scripts/generate_visualizations.py`) для обоих датасетов
 
 ### Типовые сценарии (время ориентировочно)
 
@@ -582,6 +596,7 @@ $$\pi(a|s) = \begin{cases}
 | Глубина по гипотезам | `00_quickstart` → `06_hypotheses` |
 | Фокус на OULAD | `04_oulad_data` → `00_quickstart` (конфиг OULAD) → `06_hypotheses` |
 | Качество траекторий | `07_trajectories` (после обучения) |
+| Визуализация для презентации | `08_student_profile_trajectories` (после обучения моделей) |
 
 ## Необходимые зависимости
 

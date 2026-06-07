@@ -16,6 +16,7 @@ import matplotlib
 
 matplotlib.use("Agg")  # Режим без графического интерфейса для CLI и ноутбуков
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 if TYPE_CHECKING:
@@ -281,15 +282,49 @@ def _plot_context_impacts(analyzer):
 
 def _plot_timeliness(analyzer):
     expected = analyzer.assessment_expected.copy()
-    delay = expected[expected["submitted"] == 1]["delay_days_clipped"].fillna(0)
-    plt.figure(figsize=(9, 5))
-    plt.hist(delay, bins=40)
-    plt.title("Распределение задержек сдачи assessment")
-    plt.xlabel("Задержка в днях (0 = вовремя)")
-    plt.ylabel("Количество сдач")
-    plt.tight_layout()
-    plt.savefig(analyzer.fig_dir / "oulad_submission_delay_distribution.png", dpi=200)
-    plt.close()
+    delay = (
+        expected[expected["submitted"] == 1]["delay_days_clipped"]
+        .fillna(0)
+        .to_numpy(dtype=float)
+    )
+    # Обрезка по оси X: после ~10¹ дней хвост с редкими наблюдениями «съедает» масштаб графика.
+    display_max_delay = 10.0
+    n_bins = 20
+
+    clipped_mask = delay > display_max_delay
+    n_above = int(np.sum(clipped_mask))
+    share_above = (n_above / delay.size) if delay.size else 0.0
+    delay_vis = delay[~clipped_mask] if delay.size else delay
+
+    bins = np.linspace(0.0, display_max_delay, n_bins + 1)
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.hist(delay_vis, bins=bins, color="steelblue", edgecolor="white", linewidth=0.35)
+    ax.set_xlim(0.0, display_max_delay)
+    ax.set_title("Распределение задержек сдачи assessment")
+    if n_above:
+        ax.text(
+            0.99,
+            0.97,
+            (
+                f"Не показано: {n_above} сдач с задержкой > {display_max_delay:.0f} дней "
+                f"({share_above:.1%})."
+            ),
+            transform=ax.transAxes,
+            ha="right",
+            va="top",
+            fontsize=8,
+            alpha=0.85,
+            linespacing=1.15,
+        )
+    ax.set_xlabel(
+        f"Задержка, дней (0 = вовремя; только 0 … {display_max_delay:.0f}; остальной хвост отрезан)"
+    )
+    ax.set_ylabel("Количество сдач")
+    ax.grid(alpha=0.25, which="both", linestyle=":")
+    fig.tight_layout()
+    fig.savefig(analyzer.fig_dir / "oulad_submission_delay_distribution.png", dpi=200)
+    plt.close(fig)
 
 
 def _plot_proxy_correlations(analyzer):
